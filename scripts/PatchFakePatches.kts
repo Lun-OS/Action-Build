@@ -273,14 +273,20 @@ fun applyPostPatchFixups() {
         }
     }
     // 修复 SUSFS 补丁与 SukiSU Ultra 版本不兼容问题
-    // SUSFS v2.3.0 调用 ksu_handle_post_execveat_sucompat，但 SukiSU Ultra v4.2.0 只有 ksu_handle_execveat_sucompat
+    // SUSFS v2.3.0 调用 6 参数版本的 ksu_handle_post_execveat_sucompat，但 SukiSU Ultra v4.2.0 只有 5 参数版本的 ksu_handle_execveat_sucompat
     val execC = f("fs/exec.c")
     if (execC.exists() && execC.readText().contains("ksu_handle_post_execveat_sucompat")) {
+        // 1. 替换函数名
         execC.replaceEachLine(
             Regex("""ksu_handle_post_execveat_sucompat"""),
             "ksu_handle_execveat_sucompat"
         )
-        logPostfix(execC, "replaced ksu_handle_post_execveat_sucompat with ksu_handle_execveat_sucompat (SUSFS/SukiSU Ultra version mismatch fix)")
+        // 2. 去掉多余的最后一个参数 &retval（函数调用行末尾的 ", &retval)" 改成 ")"）
+        execC.replaceEachLine(
+            Regex(""",\s*&retval\);$"""),
+            ");"
+        )
+        logPostfix(execC, "replaced ksu_handle_post_execveat_sucompat with ksu_handle_execveat_sucompat and removed extra retval argument (SUSFS/SukiSU Ultra version mismatch fix)")
     }
 
 }
