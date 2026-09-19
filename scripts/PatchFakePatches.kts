@@ -469,20 +469,32 @@ fun revert() {
             logRevert(base, "removed #include <linux/dma-buf.h>")
         }
         if (sublevel >= 157) {
-            val namespace = f("fs/namespace.c")
-            namespace.insertAfter(
-                Regex("""^#include "internal\.h"$"""),
-                "#include <trace/hooks/blk.h>"
-            )
-            logRevert(namespace, "restored #include <trace/hooks/blk.h> directly after #include \"internal.h\"")
+    val traceBlkH = f("include/trace/hooks/blk.h")
+    val traceFsH = f("include/trace/hooks/fs.h")
 
-            val superC = f("fs/super.c")
-            superC.insertAfter(
-                Regex("""^#include "internal\.h"$"""),
-                "#include <trace/hooks/fs.h>"
-            )
-            logRevert(superC, "restored #include <trace/hooks/fs.h> directly after #include \"internal.h\"")
-        }
+    if (traceBlkH.exists()) {
+        val namespace = f("fs/namespace.c")
+        namespace.insertAfter(
+            Regex("""^#include "internal\.h"$"""),
+            "#include <trace/hooks/blk.h>"
+        )
+        logRevert(namespace, "restored #include <trace/hooks/blk.h> directly after #include \"internal.h\"")
+    } else {
+        logRevert(f("fs/namespace.c"), "skipped restoring #include <trace/hooks/blk.h> because include/trace/hooks/blk.h does not exist (likely MTK platform)")
+    }
+
+    if (traceFsH.exists()) {
+        val superC = f("fs/super.c")
+        superC.insertAfter(
+            Regex("""^#include "internal\.h"$"""),
+            "#include <trace/hooks/fs.h>"
+        )
+        logRevert(superC, "restored #include <trace/hooks/fs.h> directly after #include \"internal.h\"")
+    } else {
+        logRevert(f("fs/super.c"), "skipped restoring #include <trace/hooks/fs.h> because include/trace/hooks/fs.h does not exist (likely MTK platform)")
+    }
+}
+
     }
 
     if (kmi == "android15-6.6") {
