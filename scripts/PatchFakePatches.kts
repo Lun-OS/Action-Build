@@ -276,17 +276,36 @@ fun applyPostPatchFixups() {
     // SUSFS v2.3.0 调用 6 参数版本的 ksu_handle_post_execveat_sucompat，但 SukiSU Ultra v4.2.0 只有 5 参数版本的 ksu_handle_execveat_sucompat
     val execC = f("fs/exec.c")
     if (execC.exists() && execC.readText().contains("ksu_handle_post_execveat_sucompat")) {
-        // 1. 替换函数名
+        // 1. 删除 SUSFS 添加的重复 extern 声明（它是 6 参数版本，和内核原生的 5 参数版本冲突）
+        // 找到包含 ksu_handle_post_execveat_sucompat 的 extern 声明，删除整段
+        val lines = execC.readLines().toMutableList()
+        var i = 0
+        while (i < lines.size) {
+            if (lines[i].contains("extern int ksu_handle_post_execveat_sucompat")) {
+                // 删除这一行和下一行（声明通常分两行写）
+                lines.removeAt(i)
+                if (i < lines.size && lines[i].trim().startsWith("void *envp")) {
+                    lines.removeAt(i)
+                }
+                break
+            }
+            i++
+        }
+        execC.writeText(lines.joinToString("\n") + "\n")
+        
+        // 2. 替换函数名
         execC.replaceEachLine(
             Regex("""ksu_handle_post_execveat_sucompat"""),
             "ksu_handle_execveat_sucompat"
         )
-        // 2. 去掉多余的最后一个参数 &retval（函数调用行末尾的 ", &retval)" 改成 ")"）
+        
+        // 3. 去掉多余的最后一个参数 &retval（函数调用行末尾的 ", &retval)" 改成 ")"）
         execC.replaceEachLine(
             Regex(""",\s*&retval\);$"""),
             ");"
         )
-        logPostfix(execC, "replaced ksu_handle_post_execveat_sucompat with ksu_handle_execveat_sucompat and removed extra retval argument (SUSFS/SukiSU Ultra version mismatch fix)")
+        
+        logPostfix(execC, "removed duplicate extern declaration, replaced function name, and removed extra retval argument (SUSFS/SukiSU Ultra version mismatch fix)")
     }
 
 }
