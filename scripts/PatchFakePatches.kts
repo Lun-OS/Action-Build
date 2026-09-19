@@ -271,6 +271,16 @@ fun applyPostPatchFixups() {
             )
             logPostfix(openC, "rewrote 3-arg getname_flags(filename, lookup_flags, NULL) calls to the 2-arg form getname_flags(filename, lookup_flags) required on this 6.12 baseline")
         }
+// 修复 SUSFS 补丁与 SukiSU Ultra 版本不兼容问题
+    // SUSFS v2.3.0 调用 ksu_handle_post_execveat_sucompat，但 SukiSU Ultra v4.2.0 只有 ksu_handle_execveat_sucompat
+    val execC = f("fs/exec.c")
+    if (execC.exists() && execC.readText().contains("ksu_handle_post_execveat_sucompat")) {
+        execC.replaceEachLine(
+            Regex("""ksu_handle_post_execveat_sucompat"""),
+            "ksu_handle_execveat_sucompat"
+        )
+        logPostfix(execC, "replaced ksu_handle_post_execveat_sucompat with ksu_handle_execveat_sucompat (SUSFS/SukiSU Ultra version mismatch fix)")
+    }
     }
 }
 
