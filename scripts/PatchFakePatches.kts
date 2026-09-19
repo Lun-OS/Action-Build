@@ -104,6 +104,9 @@ fun File.replaceWholeLine(oldLine: String, newLine: String) {
 
 val kmi = System.getenv("KMI") ?: ""
 val sublevel = (System.getenv("SUBLEVEL") ?: "0").toIntOrNull() ?: 0
+val cpu = System.getenv("CPU") ?: ""
+val manifestBranch = System.getenv("MANIFEST_BRANCH") ?: ""
+val isMTK = cpu.lowercase().startsWith("mt") || manifestBranch.lowercase().contains("mt")
 val mode = args.getOrNull(0) ?: "apply" // apply | postfix | revert
 val workDir = args.getOrNull(1) ?: "kernel_workspace/kernel_platform/common"
 
@@ -469,31 +472,26 @@ fun revert() {
             logRevert(base, "removed #include <linux/dma-buf.h>")
         }
         if (sublevel >= 157) {
-    val traceBlkH = f("include/trace/hooks/blk.h")
-    val traceFsH = f("include/trace/hooks/fs.h")
+            if (!isMTK) {
+                val namespace = f("fs/namespace.c")
+                namespace.insertAfter(
+                    Regex("""^#include "internal\.h"$"""),
+                    "#include <trace/hooks/blk.h>"
+                )
+                logRevert(namespace, "restored #include <trace/hooks/blk.h> directly after #include \"internal.h\"")
 
-    if (traceBlkH.exists()) {
-        val namespace = f("fs/namespace.c")
-        namespace.insertAfter(
-            Regex("""^#include "internal\.h"$"""),
-            "#include <trace/hooks/blk.h>"
-        )
-        logRevert(namespace, "restored #include <trace/hooks/blk.h> directly after #include \"internal.h\"")
-    } else {
-        logRevert(f("fs/namespace.c"), "skipped restoring #include <trace/hooks/blk.h> because include/trace/hooks/blk.h does not exist (likely MTK platform)")
-    }
+                val superC = f("fs/super.c")
+                superC.insertAfter(
+                    Regex("""^#include "internal\.h"$"""),
+                    "#include <trace/hooks/fs.h>"
+                )
+                logRevert(superC, "restored #include <trace/hooks/fs.h> directly after #include \"internal.h\"")
+            } else {
+                logRevert(f("fs/namespace.c"), "skipped restoring #include <trace/hooks/blk.h> on MTK platform")
+                logRevert(f("fs/super.c"), "skipped restoring #include <trace/hooks/fs.h> on MTK platform")
+            }
+        }
 
-    if (traceFsH.exists()) {
-        val superC = f("fs/super.c")
-        superC.insertAfter(
-            Regex("""^#include "internal\.h"$"""),
-            "#include <trace/hooks/fs.h>"
-        )
-        logRevert(superC, "restored #include <trace/hooks/fs.h> directly after #include \"internal.h\"")
-    } else {
-        logRevert(f("fs/super.c"), "skipped restoring #include <trace/hooks/fs.h> because include/trace/hooks/fs.h does not exist (likely MTK platform)")
-    }
-}
 
     }
 
