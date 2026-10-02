@@ -672,12 +672,21 @@ jobs:
           [[ -n "$KSU_CUSTOM_TAG" ]] && echo "自定义版本标识: $KSU_CUSTOM_TAG" || echo "自定义版本标识: 未启用"
           [[ -n "$MANUAL_HASH" ]] && echo "手动指定 hash: $MANUAL_HASH" || echo "手动指定 hash: 未启用"
 
+          # ===== 固定 SukiSU 源码到版本 KSUVER=40819 =====
+          # KSUVER = (管理器分支提交总数) + 37185，3634 + 37185 = 40819
+          KSU_PIN_MANAGER_HASH="88d619ed6159156ea3518822a947d0950891c138"
+          KSU_PIN_BUILTIN_HASH="b88403d2561b6e00dff84a3c851e630c62f57fd0"
+          if [[ -z "$MANUAL_HASH" ]]; then
+            MANUAL_HASH="$KSU_PIN_BUILTIN_HASH"
+            echo "已启用固定 SukiSU builtin 提交: $MANUAL_HASH"
+          fi
+
           curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/${KSU_MANAGER_BRANCH}/kernel/setup.sh" | bash -s "$KSU_BUILTIN_BRANCH"
           cd ./KernelSU
 
           # 如果指定了手动 hash，就切换到该提交
           if [[ -n "$MANUAL_HASH" ]]; then
-            git fetch origin "$KSU_BUILTIN_BRANCH" --depth=50
+            git fetch origin "$KSU_BUILTIN_BRANCH" 2>/dev/null || true
             git checkout "$MANUAL_HASH"
             SHORT_HASH=${MANUAL_HASH:0:8}
           fi
@@ -725,6 +734,9 @@ jobs:
           if grep -q '^KSU_VERSION_API := ' kernel/Makefile; then
             sed -i "s|^KSU_VERSION_API := .*|KSU_VERSION_API := $ESC_KSU_VERSION_TAG|" kernel/Makefile
           fi
+
+          # 固定管理器分支引用，使 KSUVER = 3634 + 37185 = 40819
+          git update-ref "refs/heads/$KSU_MANAGER_BRANCH" "$KSU_PIN_MANAGER_HASH" 2>/dev/null || true
 
           KSU_VERSION=$(expr $(git rev-list --count "$KSU_MANAGER_BRANCH" 2>/dev/null || echo 13000) + 37185)
           echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
