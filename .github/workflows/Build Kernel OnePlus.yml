@@ -209,6 +209,10 @@ jobs:
           git config --global user.email "263623064@qq.com"
           mkdir kernel_workspace && cd kernel_workspace
           git clone https://github.com/Numbersf/Action-Build.git -b SukiSU-Ultra
+          # 回退 PatchFakePatches.kts 到历史版本 478ffb2d（该提交修复了 android14-6.1 >=157 时
+          # revert 误插 trace/hooks/blk.h 的问题，后续 2a35f6a 又把它带回来了）
+          git -C Action-Build checkout 478ffb2d1cc6efdfa2b3b637302016729e1d479c -- scripts/PatchFakePatches.kts
+          echo "已回退 scripts/PatchFakePatches.kts 到 478ffb2d"
 
       - name: Extract Manifest Info
         id: extract_info
