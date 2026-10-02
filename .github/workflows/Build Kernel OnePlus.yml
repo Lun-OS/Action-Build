@@ -107,7 +107,7 @@ on:
         type: string
         description: "SukiSU版本号(输入数字则固定该KSUVER，输入-1使用最新)//SukiSU version (a number pins that KSUVER; -1 uses the latest)"
         required: false
-        default: "-1"
+        default: "40900"
       LZ4_UPDATE:
         type: boolean
         description: "是否升级LZ4到上游最新？//Upgrade LZ4 to the latest upstream?"
@@ -701,28 +701,12 @@ jobs:
           curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/${KSU_MANAGER_BRANCH}/kernel/setup.sh" | bash -s "$KSU_BUILTIN_BRANCH"
           cd ./KernelSU
 
-          # 启用版本固定时，从本地 git 反解该版本对应的 main / builtin 提交
+          # 数字型 KSU_VERSION_META 只固定“版本标签”，不再反解/切换驱动提交。
+          # 旧实现会 git checkout 到 builtin 分支该日期之前的提交，可能落到
+          # [d13e8a75, b20dee70) 区间 —— 那里 kernel_umount_feature_set 被误删，导致编译失败。
+          # 驱动始终保持内置分支最新；仅当 KSU_META 第 4 段显式给出 hash 时才切换驱动。
           if [[ "$KSU_PIN_ENABLED" == "true" ]]; then
-            NEED_COUNT=$(( KSU_PIN_VERSION - 37185 ))
-            if [[ "$NEED_COUNT" -le 0 ]]; then
-              echo "错误: 版本号 $KSU_PIN_VERSION 无对应的 main 提交（需大于 37185）"
-              exit 11
-            fi
-            git fetch origin "$KSU_MANAGER_BRANCH" "$KSU_BUILTIN_BRANCH" 2>/dev/null || true
-            KSU_PIN_MANAGER_HASH=$(git rev-list --reverse "$KSU_MANAGER_BRANCH" | sed -n "${NEED_COUNT}p")
-            if [[ -z "$KSU_PIN_MANAGER_HASH" ]]; then
-              echo "错误: 版本号 $KSU_PIN_VERSION 超出 $KSU_MANAGER_BRANCH 分支提交范围，无法定位提交"
-              exit 12
-            fi
-            PIN_DATE=$(git show -s --format=%cI "$KSU_PIN_MANAGER_HASH")
-            KSU_PIN_BUILTIN_HASH=$(git rev-list -1 --before="$PIN_DATE" "$KSU_BUILTIN_BRANCH")
-            if [[ -z "$KSU_PIN_BUILTIN_HASH" ]]; then
-              KSU_PIN_BUILTIN_HASH="$KSU_PIN_MANAGER_HASH"
-            fi
-            if [[ -z "$MANUAL_HASH" ]]; then
-              MANUAL_HASH="$KSU_PIN_BUILTIN_HASH"
-            fi
-            echo "版本 $KSU_PIN_VERSION → main=$KSU_PIN_MANAGER_HASH builtin=$KSU_PIN_BUILTIN_HASH (${PIN_DATE})"
+            echo "版本标签固定: KSUVER=$KSU_PIN_VERSION（驱动保持 ${KSU_BUILTIN_BRANCH} 最新，不切换提交）"
           fi
 
           # 如果指定了手动 hash，就切换到该提交
@@ -777,18 +761,19 @@ jobs:
           fi
 
           if [[ "$KSU_PIN_ENABLED" == "true" ]]; then
-            # 固定管理器分支引用，使 KSUVER 与该版本一致
-            git update-ref "refs/heads/$KSU_MANAGER_BRANCH" "$KSU_PIN_MANAGER_HASH" 2>/dev/null || true
-
             # kernel/Makefile 会用 GitHub 实时提交数重算 KSU_VERSION，必须覆盖为固定值，
-            # 否则编译进内核的 -DKSU_VERSION 仍是最新版，仅构件命名显示固定值
+            # 否则编译进内核的 -DKSU_VERSION 仍是实时值（如 40940），与管理器版本号不一致
             if grep -qE '^KSU_VERSION[[:space:]]*:=' kernel/Makefile; then
               sed -i -E "s|^KSU_VERSION[[:space:]]*:=.*|KSU_VERSION := $KSU_PIN_VERSION|" kernel/Makefile
               echo "已固定 kernel/Makefile 中 KSU_VERSION := $KSU_PIN_VERSION"
             fi
           fi
 
-          KSU_VERSION=$(expr $(git rev-list --count "$KSU_MANAGER_BRANCH" 2>/dev/null || echo 13000) + 37185)
+          if [[ "$KSU_PIN_ENABLED" == "true" ]]; then
+            KSU_VERSION="$KSU_PIN_VERSION"
+          else
+            KSU_VERSION=$(expr $(git rev-list --count "$KSU_MANAGER_BRANCH" 2>/dev/null || echo 13000) + 37185)
+          fi
           echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
 
           echo "::group::最终 Makefile 中版本信息及部分调试结果预览"
