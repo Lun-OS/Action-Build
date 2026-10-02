@@ -107,7 +107,7 @@ on:
         type: string
         description: "SukiSU版本号(输入数字则固定该KSUVER，输入-1使用最新)//SukiSU version (a number pins that KSUVER; -1 uses the latest)"
         required: false
-        default: "40819"
+        default: "-1"
       LZ4_UPDATE:
         type: boolean
         description: "是否升级LZ4到上游最新？//Upgrade LZ4 to the latest upstream?"
