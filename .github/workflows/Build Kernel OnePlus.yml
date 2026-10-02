@@ -87,7 +87,7 @@ on:
         type: string
         description: "回退SUSFS(输入哈希或次数或-1关闭,默认已知兼容版本)//Rollback SUSFS (commit hash, count, or -1 to disable; default is a known-compatible version)"
         required: false
-        default: "153f88df3be2501d2d33364f8fe05247aecb3cef"
+        default: "e5b4d2879836cfb8379010a8ebee76c519f5c834"
       DYNAMIC_REPO:
         type: string
         description: "动态清单仓库所有者//Manifest repository owner"
