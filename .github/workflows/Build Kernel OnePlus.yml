@@ -823,6 +823,13 @@ jobs:
         run: |
           kotlin "$GITHUB_WORKSPACE/kernel_workspace/Action-Build/scripts/PatchFakePatches.kts" postfix "$GITHUB_WORKSPACE/kernel_workspace/kernel_platform/common"
           kotlin "$GITHUB_WORKSPACE/kernel_workspace/Action-Build/scripts/PatchFakePatches.kts" revert "$GITHUB_WORKSPACE/kernel_workspace/kernel_platform/common"
+          # 该内核基线 include/trace/hooks/ 下没有 blk.h，revert 脚本却会把它插回 fs/namespace.c，
+          # 导致 'trace/hooks/blk.h' file not found 致命错误；按头文件是否存在做兜底清理
+          KCOMMON="$GITHUB_WORKSPACE/kernel_workspace/kernel_platform/common"
+          if [ ! -f "$KCOMMON/include/trace/hooks/blk.h" ]; then
+            sed -i '/^#include <trace\/hooks\/blk\.h>$/d' "$KCOMMON/fs/namespace.c"
+            echo "已移除 fs/namespace.c 中指向不存在头文件的 #include <trace/hooks/blk.h>"
+          fi
 
       # OGKI转换GKI，无需修改 dtbo 开机
       - name: Apply Convert HMBIRD_OGKI to HMBIRD_GKI
