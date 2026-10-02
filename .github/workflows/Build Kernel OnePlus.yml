@@ -676,6 +676,7 @@ jobs:
           # KSUVER = (管理器分支提交总数) + 37185，3634 + 37185 = 40819
           KSU_PIN_MANAGER_HASH="88d619ed6159156ea3518822a947d0950891c138"
           KSU_PIN_BUILTIN_HASH="b88403d2561b6e00dff84a3c851e630c62f57fd0"
+          KSU_PIN_VERSION="40819"
           if [[ -z "$MANUAL_HASH" ]]; then
             MANUAL_HASH="$KSU_PIN_BUILTIN_HASH"
             echo "已启用固定 SukiSU builtin 提交: $MANUAL_HASH"
@@ -737,6 +738,13 @@ jobs:
 
           # 固定管理器分支引用，使 KSUVER = 3634 + 37185 = 40819
           git update-ref "refs/heads/$KSU_MANAGER_BRANCH" "$KSU_PIN_MANAGER_HASH" 2>/dev/null || true
+
+          # kernel/Makefile 会用 GitHub 实时提交数重算 KSU_VERSION，必须覆盖为固定值，
+          # 否则编译进内核的 -DKSU_VERSION 仍是最新版（40940），仅构件命名显示 40819
+          if grep -qE '^KSU_VERSION[[:space:]]*:=' kernel/Makefile; then
+            sed -i -E "s|^KSU_VERSION[[:space:]]*:=.*|KSU_VERSION := $KSU_PIN_VERSION|" kernel/Makefile
+            echo "已固定 kernel/Makefile 中 KSU_VERSION := $KSU_PIN_VERSION"
+          fi
 
           KSU_VERSION=$(expr $(git rev-list --count "$KSU_MANAGER_BRANCH" 2>/dev/null || echo 13000) + 37185)
           echo "KSUVER=$KSU_VERSION" >> $GITHUB_ENV
