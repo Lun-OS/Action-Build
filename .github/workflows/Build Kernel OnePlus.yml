@@ -797,8 +797,21 @@ jobs:
             if [ -n "$SUSFS_META" ]; then
               if [[ "$SUSFS_META" =~ ^[0-9]+$ ]]; then
                 git checkout HEAD~$SUSFS_META
-              else
+              elif git merge-base --is-ancestor "$SUSFS_META" HEAD 2>/dev/null; then
                 git checkout "$SUSFS_META"
+              else
+                # 指定的提交不在当前 KMI 分支历史中（例如 e5b4d287 仅存在于 gki-android14-6.1）。
+                # 此时强行 checkout 会切到其它 KMI 的补丁集合，导致后面
+                # cp 50_add_susfs_in_gki-${KANDROID_VERSION}-${KERNEL_VERSION}.patch 找不到文件。
+                # 自动改用当前分支最新的 "KernelSU: Sync" 提交（各分支等价角色）。
+                AUTO_SYNC=$(git log --format='%H' -1 --grep='^KernelSU: Sync with the official KernelSU main repo$' HEAD)
+                if [ -n "$AUTO_SYNC" ]; then
+                  echo "⚠️ SUSFS_META=$SUSFS_META 不在当前分支历史中，自动改用该分支最新 KernelSU Sync 提交: $AUTO_SYNC"
+                  git checkout "$AUTO_SYNC"
+                else
+                  echo "❌ SUSFS_META=$SUSFS_META 不在当前分支历史中，且未找到 KernelSU Sync 提交"
+                  exit 1
+                fi
               fi
             else
               echo "SUSFS_META 为空，使用最新上游 SUSFS"
